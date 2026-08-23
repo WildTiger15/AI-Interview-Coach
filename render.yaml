@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: ai-interview-coach-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt && python -m scripts.build_index"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false # set manually in the Render dashboard — never commit this
+      - key: FRONTEND_ORIGIN
+        value: "" # fill in after the static site below is created, e.g. https://ai-interview-coach.onrender.com
+
+  - type: web
+    name: ai-interview-coach
+    runtime: static
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "" # fill in with the api service's URL above, e.g. https://ai-interview-coach-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

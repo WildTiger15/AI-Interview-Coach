@@ -1,22 +1,82 @@
-# quick-rag
-A quick and simple RAG implementation, reads from markdown and text data sources and provides a conversational chat bot. 
+# AI Interview Coach
 
-TODO:
-- Add memory, so the chatbot can remember details from the conversation.
-- Wrap the ChatBot into a class that supports multiple concurrent conversations.
-- Implement a client / server architecture to allow multiple concurrent conversations.
-- Add a UI to simplify the interaction with the users.
+A mock-interview coach: pick a track, talk to an animated AI coach out loud,
+and get instant STAR-method feedback — backed by a FastAPI + LangChain RAG
+service and a React + Tailwind + Framer Motion animated demo UI with real
+voice input/output.
 
-## Instructions
-1. Place your OpenAI and LangChain API keys in `RAGConfig.py`
-``` python
-    __EnvironmentVariablesDict = {
-        "LANGCHAIN_TRACING_V2": "true",
-        "LANGCHAIN_API_KEY": "<PLACE YOUR LANGCHAIN API KEY HERE>",
-        "OPENAI_API_KEY": "<PLACE YOUR OPENAI API KEY HERE>",
-    }
+Originally forked from `quick-rag` (a terminal RAG chatbot); this rebuild
+adds a proper backend API, real interview content, session state, a
+mock-interview flow, and a full animated frontend.
+
+## Project structure
+```
+backend/            FastAPI service + LangChain/Chroma RAG
+  app/               API routes, config, interview logic, question bank
+  data/knowledge/    Interview-coaching source docs (STAR method, tips, etc.)
+  scripts/           Index-building script
+frontend/            Vite + React + TypeScript + Tailwind + Framer Motion
 ```
 
-2. Run `python CreateDataBase.py` to extract the info in `data/books` into a Chroma database, this will be the base of knowledge for our RAG. Be aware that you can add more markdown and text files to the books folder to expand the knowledge base.
+## Running it
 
-3. Run `python ChatBot.py` and chat with the ChatBot interactively, remember that it is constrained to try to respond queries from the knowledge base. Try playing with it, asking questions in and out of the knowledge base to see how it responds.
+### 1. Backend
+```bash
+cd backend
+python -m venv .venv
+.venv/Scripts/activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
+pip install -r requirements.txt
+cp .env.example .env          # then add your real OPENAI_API_KEY
+python -m scripts.build_index # optional: builds the RAG index (needs a real key)
+uvicorn app.main:app --reload --port 8000
+```
+Without a real `OPENAI_API_KEY`, the backend still runs — it serves clearly
+labeled canned "demo mode" feedback so the UI is fully explorable without
+API costs.
+
+### 2. Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open http://localhost:5173. The Vite dev server proxies `/api` to the
+backend on port 8000.
+
+## How it works
+- **Mock interview**: `POST /api/session` starts a session for a track
+  (Software Engineer / Product Manager / General) and returns the first of
+  5 curated questions. `POST /api/session/{id}/answer` scores the answer
+  (1-5), lists strengths/improvements, and suggests a rewrite — grounded in
+  the STAR-method knowledge base via retrieval when a real key is
+  configured. After the last question, the session returns a summary with
+  an average score and recurring improvement themes.
+- **Open Q&A** (`POST /api/ask`): the original repo's general RAG chatbot
+  behavior, preserved as a secondary mode over the same knowledge base.
+- **RAG index**: `backend/data/knowledge/*.md` is chunked and embedded into
+  a local Chroma DB (`backend/chroma/`, gitignored) by
+  `scripts/build_index.py`.
+
+## Voice
+- **Speech input**: tap the mic button to dictate your answer via the
+  browser's built-in speech recognition (Chrome/Edge). Falls back to typing
+  if unsupported.
+- **Speech output**: the AI coach speaks every question and feedback aloud.
+  With a real `OPENAI_API_KEY`, this uses OpenAI TTS (`POST /api/tts`,
+  natural-sounding voice); without one, it falls back to the browser's
+  built-in speech synthesis automatically.
+- **Animated avatar**: a reactive face (`frontend/src/components/Avatar.tsx`)
+  blinks, idles, and opens/closes its mouth in sync with live audio
+  amplitude while speaking, and shows distinct listening/thinking/speaking
+  states.
+
+## Deploying
+See [DEPLOY.md](DEPLOY.md) for hosting this on Render (a `render.yaml`
+Blueprint provisions both the backend API and the static frontend from this
+repo).
+
+## Notes
+- No secrets are committed — `backend/.env` is gitignored; use
+  `backend/.env.example` as the template.
+- `backend/chroma/`, `frontend/node_modules/`, and `frontend/dist/` are
+  gitignored build/data artifacts.
